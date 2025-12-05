@@ -5,6 +5,7 @@ import { ActionCard } from "./components/ActionCard";
 import { TaskCard } from "./components/TaskCard";
 import { ResourceRow } from "./components/ResourceRow";
 import { EquipmentView } from "./components/EquipmentView";
+import { ConverterCard } from "./components/ConverterCard";
 import { ResourceConfig } from "./types";
 
 // --- Components ---
@@ -385,128 +386,48 @@ const GameLayout: React.FC = () => {
                     {activeTab === 'equipment' && <EquipmentView />}
 
                     {activeTab === 'converters' && (
-                        <div className="flex-grow overflow-y-auto p-4 max-w-2xl mx-auto w-full">
-                            {/* Owned Converters */}
+                        <div className="flex-grow overflow-y-auto p-4 max-w-4xl mx-auto w-full">
+                            {/* Owned Converters Section */}
                             {config.converters.some(c => state.converters[c.id]?.owned) && (
-                                <div className="mb-6">
-                                    <h3 className="text-xs font-bold text-gray-600 uppercase border-b border-gray-200 mb-3 pb-1">
-                                        Owned Converters
-                                    </h3>
-                                    <div className="grid grid-cols-1 gap-3">
-                                        {config.converters.filter(c => state.converters[c.id]?.owned).map(converter => {
-                                            const cState = state.converters[converter.id];
-                                            const canAfford = converter.costPerSecond.every(c =>
-                                                (state.resources[c.resourceId]?.current || 0) > 0
-                                            );
-                                            return (
-                                                <div key={converter.id} className={`p-3 border rounded-md shadow-sm ${cState.active ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-200'}`}>
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <div>
-                                                            <h4 className="font-bold text-gray-800 flex items-center gap-2">
-                                                                {converter.name}
-                                                                {cState.active && <span className="text-[10px] px-1.5 py-0.5 bg-green-500 text-white rounded">ACTIVE</span>}
-                                                                {!converter.canBeToggled && <span className="text-[10px] px-1.5 py-0.5 bg-orange-400 text-white rounded">ALWAYS ON</span>}
-                                                            </h4>
-                                                            <p className="text-xs text-gray-500">{converter.description}</p>
-                                                        </div>
-                                                        {converter.canBeToggled && (
-                                                            <button
-                                                                onClick={() => toggleConverter(converter.id)}
-                                                                disabled={!cState.active && !canAfford}
-                                                                className={`px-3 py-1 text-xs font-bold rounded transition-colors ${cState.active
-                                                                    ? 'bg-red-100 text-red-600 hover:bg-red-200'
-                                                                    : canAfford
-                                                                        ? 'bg-green-100 text-green-600 hover:bg-green-200'
-                                                                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                                                    }`}
-                                                            >
-                                                                {cState.active ? 'Stop' : 'Start'}
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                    <div className="text-[10px] space-y-1">
-                                                        <div className="flex gap-4">
-                                                            <span className="text-red-600">
-                                                                Cost/s: {converter.costPerSecond.map(c => {
-                                                                    const res = config.resources.find(r => r.id === c.resourceId);
-                                                                    return `${c.amount} ${res?.name || c.resourceId}`;
-                                                                }).join(', ')}
-                                                            </span>
-                                                            <span className="text-green-600">
-                                                                Gain/s: {converter.effectsPerSecond.filter(e => e.type === 'add_resource').map(e => {
-                                                                    const res = config.resources.find(r => r.id === e.resourceId);
-                                                                    return `${e.amount} ${res?.name || e.resourceId}`;
-                                                                }).join(', ')}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
+                                <div className="mb-4 border border-gray-200 rounded-sm overflow-hidden shadow-sm">
+                                    <SectionHeader
+                                        title="Owned Converters"
+                                        isOpen={!collapsedSections['conv-owned']}
+                                        onToggle={() => toggleSection('conv-owned')}
+                                        count={config.converters.filter(c => state.converters[c.id]?.owned).length}
+                                        colorClass="bg-gray-200"
+                                    />
+                                    {!collapsedSections['conv-owned'] && (
+                                        <div className="p-2 bg-gray-50/50">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                                {config.converters.filter(c => state.converters[c.id]?.owned).map(converter => (
+                                                    <ConverterCard key={converter.id} converter={converter} isOwned={true} />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
-                            {/* Available Converters */}
+                            {/* Available Converters Section */}
                             {config.converters.some(c => state.converters[c.id]?.unlocked && !state.converters[c.id]?.owned) && (
-                                <div>
-                                    <h3 className="text-xs font-bold text-gray-600 uppercase border-b border-gray-200 mb-3 pb-1">
-                                        Available Converters
-                                    </h3>
-                                    <div className="grid grid-cols-1 gap-3">
-                                        {config.converters.filter(c => state.converters[c.id]?.unlocked && !state.converters[c.id]?.owned).map(converter => {
-                                            const canAfford = converter.cost.every(c =>
-                                                (state.resources[c.resourceId]?.current || 0) >= c.amount
-                                            );
-                                            return (
-                                                <div key={converter.id} className="p-3 border border-gray-200 rounded-md bg-white shadow-sm">
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <div>
-                                                            <h4 className="font-bold text-gray-800">{converter.name}</h4>
-                                                            <p className="text-xs text-gray-500">{converter.description}</p>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => buyConverter(converter.id)}
-                                                            disabled={!canAfford}
-                                                            className={`px-3 py-1 text-xs font-bold rounded transition-colors ${canAfford
-                                                                ? 'bg-blue-500 text-white hover:bg-blue-600'
-                                                                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                                                }`}
-                                                        >
-                                                            Buy
-                                                        </button>
-                                                    </div>
-                                                    <div className="text-[10px] space-y-1">
-                                                        <div className="text-blue-600">
-                                                            Cost: {converter.cost.map(c => {
-                                                                const res = config.resources.find(r => r.id === c.resourceId);
-                                                                return `${c.amount} ${res?.name || c.resourceId}`;
-                                                            }).join(', ')}
-                                                        </div>
-                                                        <div className="flex gap-4">
-                                                            <span className="text-red-600">
-                                                                Cost/s: {converter.costPerSecond.map(c => {
-                                                                    const res = config.resources.find(r => r.id === c.resourceId);
-                                                                    return `${c.amount} ${res?.name || c.resourceId}`;
-                                                                }).join(', ')}
-                                                            </span>
-                                                            <span className="text-green-600">
-                                                                Gain/s: {converter.effectsPerSecond.filter(e => e.type === 'add_resource').map(e => {
-                                                                    const res = config.resources.find(r => r.id === e.resourceId);
-                                                                    return `${e.amount} ${res?.name || e.resourceId}`;
-                                                                }).join(', ')}
-                                                            </span>
-                                                        </div>
-                                                        {!converter.canBeToggled && (
-                                                            <div className="text-gray-500 font-medium">
-                                                                Cannot be turned off once purchased.
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
+                                <div className="mb-4 border border-gray-200 rounded-sm overflow-hidden shadow-sm">
+                                    <SectionHeader
+                                        title="Available Converters"
+                                        isOpen={!collapsedSections['conv-available']}
+                                        onToggle={() => toggleSection('conv-available')}
+                                        count={config.converters.filter(c => state.converters[c.id]?.unlocked && !state.converters[c.id]?.owned).length}
+                                        colorClass="bg-gray-200"
+                                    />
+                                    {!collapsedSections['conv-available'] && (
+                                        <div className="p-2 bg-gray-50/50">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                                {config.converters.filter(c => state.converters[c.id]?.unlocked && !state.converters[c.id]?.owned).map(converter => (
+                                                    <ConverterCard key={converter.id} converter={converter} isOwned={false} />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

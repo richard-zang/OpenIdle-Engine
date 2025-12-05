@@ -472,8 +472,26 @@ const gameReducer = (state: GameState, action: Action): GameState => {
                 if (e.chance !== undefined && Math.random() > e.chance) return;
 
                 if (e.type === 'add_resource' && e.resourceId) {
-                    const scale = e.scaleFactor ? Math.pow(e.scaleFactor, level - 1) : 1;
-                    const amount = e.amount * scale * yieldMulti;
+                    let amount = e.amount;
+                    if (e.scaleFactor) {
+                        const exponent = level - 1;
+                        switch (e.scaleType) {
+                            case 'fixed':
+                                // Linear: amount + (scaleFactor * exponent)
+                                amount = e.amount + (e.scaleFactor * exponent);
+                                break;
+                            case 'percentage':
+                                // Percentage: amount * (1 + scaleFactor * exponent)
+                                amount = e.amount * (1 + e.scaleFactor * exponent);
+                                break;
+                            case 'exponential':
+                            default:
+                                // Exponential: amount * (scaleFactor ^ exponent)
+                                amount = e.amount * Math.pow(e.scaleFactor, exponent);
+                                break;
+                        }
+                    }
+                    amount *= yieldMulti;
                     const current = newResources[e.resourceId].current;
                     const rConfig = RESOURCES.find(r => r.id === e.resourceId);
                     const max = calculateMax(e.resourceId, allModifiers, rConfig?.baseMax ?? 100);
@@ -754,20 +772,14 @@ const gameReducer = (state: GameState, action: Action): GameState => {
                 if (!config) return;
 
                 // Check if can afford per-second costs
-                const canAfford = config.costPerSecond.every(c =>
-                    (newResources[c.resourceId]?.current || 0) >= (c.amount * dtSeconds)
-                );
+                const canAfford = config.costPerSecond.every(c => {
+                    const available = newResources[c.resourceId]?.current || 0;
+                    const needed = c.amount * dtSeconds;
+                    return available >= needed;
+                });
 
+                // Just skip if can't afford - don't deactivate
                 if (!canAfford) {
-                    // Deactivate converter if it can be toggled, otherwise just skip
-                    if (config.canBeToggled) {
-                        if (!convertersChanged) {
-                            newConverters = { ...newConverters };
-                            convertersChanged = true;
-                        }
-                        newConverters[cid] = { ...cState, active: false };
-                        logUpdates.unshift(`${config.name} deactivated (insufficient resources)`);
-                    }
                     return;
                 }
 
@@ -814,8 +826,11 @@ const gameReducer = (state: GameState, action: Action): GameState => {
                     }
                     if (p.taskId) {
                         const task = newTasks[p.taskId];
-                        const minLvl = p.minLevel || 1;
-                        if (!task || task.level < minLvl) return false;
+                        if (!task) return false;
+                        // minLevel checks task level
+                        if (p.minLevel !== undefined && task.level < p.minLevel) return false;
+                        // minAmount checks task completions
+                        if (p.minAmount !== undefined && (task.completions || 0) < p.minAmount) return false;
                     }
                     return true;
                 });
@@ -1027,8 +1042,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
             if (p.taskId) {
                 const task = state.tasks[p.taskId];
-                const minLvl = p.minLevel || 1;
-                if (!task || task.level < minLvl) return false;
+                if (!task) return false;
+                // minLevel checks task level
+                if (p.minLevel !== undefined && task.level < p.minLevel) return false;
+                // minAmount checks task completions
+                if (p.minAmount !== undefined && (task.completions || 0) < p.minAmount) return false;
             }
             return true;
         });
@@ -1141,6 +1159,15 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (!cState.owned || !cState.active) return;
             const converter = CONVERTERS.find(c => c.id === cid);
             if (!converter) return;
+
+            // Check if converter can afford to run (same check as TICK)
+            const canAfford = converter.costPerSecond.every(c => {
+                const available = state.resources[c.resourceId]?.current || 0;
+                // Use a small dt approximation for the check
+                const needed = c.amount * 0.1; // ~100ms tick
+                return available >= needed;
+            });
+            if (!canAfford) return;
 
             // Converter costs
             converter.costPerSecond.forEach(c => {

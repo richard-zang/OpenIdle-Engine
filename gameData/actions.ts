@@ -29,8 +29,8 @@ export const ACTIONS: ActionConfig[] = [
   },
   {
     id: "clean_app",
-    name: "Clean Appartment",
-    description: "Clean up your appartment. Keep a sense of normalcy.",
+    name: "Clean Apartment",
+    description: "Clean up your apartment. Keep a sense of normalcy.",
     category: "mundane",
     costs: [{ resourceId: 'stamina', amount: 1, scaleFactor: 1 }],
     effects: [
@@ -105,11 +105,11 @@ export const ACTIONS: ActionConfig[] = [
     description: "Train your brain to handle more concurrent threads.",
     category: "mundane",
     costs: [
-        { resourceId: 'insight', amount: 5 },
-        { resourceId: 'stamina', amount: 10 }
+      { resourceId: 'insight', amount: 5 },
+      { resourceId: 'stamina', amount: 10 }
     ],
     effects: [
-        { type: 'increase_max_tasks', amount: 1 }
+      { type: 'increase_max_tasks', amount: 1 }
     ],
     maxExecutions: 1,
     prerequisites: [{ resourceId: 'insight', minAmount: 2 }]
