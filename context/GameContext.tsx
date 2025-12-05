@@ -498,7 +498,6 @@ const gameReducer = (state: GameState, action: Action): GameState => {
                  newTasks[tid] = { ...tState, paid: true };
                  tState = newTasks[tid];
             } else if (tid === 'fester' && config.startCosts) {
-                 // Removed: logUpdates.unshift(`DEBUG: Fester already paid (${tState.paid})`);
             }
 
             // Check Costs (Continuous)
@@ -540,16 +539,11 @@ const gameReducer = (state: GameState, action: Action): GameState => {
                 newTasks[tid] = { ...tState, progress: newProgress };
                 tState = newTasks[tid]; // Update local reference
                 
-                // Heartbeat Log Removed
-                // if (tid === 'fester' && Math.floor(newProgress) > Math.floor(oldProgress)) {
-                //     logUpdates.unshift(`DEBUG: Fester Heartbeat ${Math.floor(newProgress)}s`);
-                // }
+
                 
                 // Use epsilon for float comparison
                 if (newProgress >= config.progressRequired - 0.0001) {
                     // --- TASK COMPLETED ---
-                    // Completion Log Removed
-                    // if (tid === 'fester') logUpdates.unshift(`DEBUG: Fester ENTERING COMPLETION BLOCK.`);
                     tState.progress = 0;
                     
                     const completions = tState.completions || 0;
@@ -564,8 +558,6 @@ const gameReducer = (state: GameState, action: Action): GameState => {
                     if (config.completionEffects) {
                         config.completionEffects.forEach(e => {
                             applyTaskEffect(e, tState.level, yieldMulti);
-                            // Applied Effect Log Removed
-                            // if (tid === 'fester') logUpdates.unshift(`DEBUG: Applied ${e.type} ${e.amount}`);
                         });
                     }
 
