@@ -517,7 +517,7 @@ const GameLayout: React.FC = () => {
                                             title="Click to stop task"
                                         >
                                             {/* Progress Bar Background */}
-                                            {req > 0 && (
+                                            {(task.progressRequired || 0) > 0 && (
                                                 <div className="absolute left-0 bottom-0 h-0.5 bg-gray-100 w-full">
                                                     <div
                                                         className={`h-full transition-all duration-200 ${isLoop ? 'bg-orange-400' : 'bg-blue-500'}`}
