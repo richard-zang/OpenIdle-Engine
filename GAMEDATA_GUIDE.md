@@ -1,110 +1,99 @@
-
 # OpenIdle Engine - Game Data Guide
 
-This document explains how to create content for the OpenIdle Engine. It details the data structures defined in `types.ts` and how to use them to create Resources, Tasks, Actions, Items, and progression systems.
+Everything you need to create content for the OpenIdle Engine. All game data lives in `gameData/` as TypeScript files exporting typed arrays.
 
-## 1. File Structure & Modularity
+---
 
-The engine uses a modular system. Data is split into logical files (e.g., `christmas.ts`, `necromancy.ts`) or categorized files (`resources.ts`, `tasks.ts`). You can also organize files into subfolders (e.g., `gameData/questlines/`).
+## File Structure
 
-To add new content:
+Data is organized into modules. Each module exports some subset of: `RESOURCES`, `TASKS`, `ACTIONS`, `CATEGORIES`, `ITEMS`, `SLOTS`, and `CONVERTERS`.
 
-1. Create a `.ts` file in the `gameData/` folder (or a subfolder).
-2. Export arrays named `RESOURCES`, `TASKS`, `ACTIONS`, `CATEGORIES`, `ITEMS`, and `SLOTS`.
+To add content:
+1. Create a new `.ts` file in `gameData/` (e.g., `necromancy.ts`).
+2. Export your arrays, typed against interfaces in `types.ts`.
 3. Import your file in `gameData/index.ts` and add it to the `modules` array.
 
-## 2. Core Concepts & Types
+You can organize files however you want—by theme (`pirates.ts`), by type (`resources.ts`), or in subfolders (`gameData/quests/`) as long as they are imported in `gameData/index.ts`.
 
-### A. Categories
+---
 
-Visual headers used to group Tasks and Actions in the main UI.
+## Core Types
+
+### Categories
+
+Visual groupings for the UI. Tasks and Actions reference these by ID.
 
 ```typescript
 interface CategoryConfig {
-  id: string;   // Unique ID (e.g., "survival")
-  name: string; // Display Name (e.g., "I: Survival")
+  id: string;   // e.g. "survival" or "upgrades"
+  name: string; // e.g. "Chapter One: Survival" or "Upgrades"
 }
 ```
 
-### B. Resources
+### Resources
 
-Currencies, Stats, or Hidden Flags.
+Currencies, stats, and hidden progression flags.
 
 ```typescript
 interface ResourceConfig {
   id: string;
   name: string;
-  type: 'basic' | 'stat'; 
-  // 'basic': Text-based (e.g., Gold: 10/100). Left Column.
-  // 'stat': Progress Bar (e.g., Health). Right Column.
-  category?: string;      // Grouping ID for the UI sidebar.
-  baseMax: number;        // Starting cap.
-  initialAmount?: number; // Starting value (default 0).
-  color?: string;         // Tailwind class for 'stat' bars (e.g., "bg-red-500").
-  description?: string;   // Tooltip description.
-  
-  // Passive generation logic. 
-  // E.g., each 1 unit of this resource generates 0.1 of target per second.
+  type: 'basic' | 'stat';  // 'basic' = text display, 'stat' = progress bar on the right of the screen
+  category?: string;       // UI grouping
+  baseMax: number;         // Starting capacity, if 0 it will be hidden
+  initialAmount?: number;  // Starting value (default: 0)
+  color?: string;          // Tailwind class for **stat bars** (e.g. "bg-red-500"), 
+  // can also be more complex, e.g. for a "Peppermint stick stripe" effect:
+  // color: "bg-[repeating-linear-gradient(45deg,_#10b981_0px,_#10b981_10px,_#ffffff_10px,_#ffffff_20px)]"
+  description?: string;    // Tooltip text
+
+  // Passive generation: each unit of this resource generates ratePerUnit of targetResourceId/sec
   passiveGen?: {
-      targetResourceId: string;
-      ratePerUnit: number;
-  }[];
+    targetResourceId: string;
+    ratePerUnit: number;
+  };
 }
 ```
 
-### C. Tasks (Loops & Progress)
+### Tasks
 
-Activities that take time. They can be infinite loops (grinding), timed loops (gathering), or finite projects (research).
+Time-based activities. Can be infinite loops, finite projects, or repeating timed tasks.
 
 ```typescript
 interface TaskConfig {
   id: string;
   name: string;
   description: string;
-  category: string; // Must match a Category ID
+  category: string;
   
-  // 'rest' tasks appear in the fallback dropdown. 
-  // The game auto-switches to the selected rest task if the main task fails costs.
-  // Mechanic: "Auto-Return": If the game switched to a Rest task due to lack of resources,
-  // it will automatically switch BACK to the original task once resources recover (> 90% of max).
-  type?: 'normal' | 'rest'; 
+  type?: 'normal' | 'rest';  // 'rest' = appears in fallback dropdown
+  
+  // Per-second costs/gains while running
+  costPerSecond: Cost[];
+  effectsPerSecond: Effect[];
+  
+  xpPerSecond?: number;  // Level up threshold = Level × 100 XP
+  drops?: { itemId: string; chancePerSecond: number }[];  // Random loot (0-1)
 
-  // Costs deducted per second. If cant afford, task stops (or switches to Rest).
-  costPerSecond: { 
-    resourceId: string; 
-    amount: number; 
-    scaleFactor?: number; // NOT IMPLEMENTED. Costs are currently flat.
-  }[];
+  // Progress bar mode (set progressRequired to enable)
+  startCosts?: Cost[];        // One-time cost when starting
+  progressRequired?: number;  // Seconds to complete
+  autoRestart?: boolean;      // Loop automatically? (default: false)
   
-  // Resources gained per second.
-  effectsPerSecond: Effect[]; 
-  
-  // Random item drops
-  drops?: { 
-    itemId: string; 
-    chancePerSecond: number; // 0.0 to 1.0 (e.g., 0.01 = 1%)
-  }[];
-
-  xpPerSecond?: number; // Defaults to 0. Level Up = Level * 100 XP.
-
-  // --- Progress Bar Logic ---
-  // If progressRequired is set, the task acts like a progress bar.
-  startCosts?: Cost[];       // One-time cost paid when starting the progress bar.
-  progressRequired?: number; // Duration in seconds to finish one cycle.
-  
-  // If true, the task restarts automatically after filling the bar (Looping).
-  // If false/undefined, the task stops after one completion (One-shot/Crafting).
-  autoRestart?: boolean; 
-  
-  completionEffects?: Effect[];      // Rewards given when progress reaches 100%.
-  firstCompletionEffects?: Effect[]; // Rewards given ONLY the first time it is finished.
+  completionEffects?: Effect[];       // Rewards on each completion
+  firstCompletionEffects?: Effect[];  // Bonus for first completion only
+  maxExecutions?: number;             // Limit total completions
 
   prerequisites?: Prerequisite[];
+  locks?: string[];           // IDs to hide/disable when this task is available
+  lockDescription?: string;   // Tooltip explaining the lock
+  hideWhenComplete?: boolean; // Hide after maxExecutions reached
 }
 ```
 
-### D. Actions (One-Shots & Upgrades)
-Buttons clicked once. Used for buying upgrades, unlocking features, or crafting.
+### Actions
+
+Instant buttons for purchases, upgrades, and crafting.
 
 ```typescript
 interface ActionConfig {
@@ -114,35 +103,32 @@ interface ActionConfig {
   category: string;
   
   costs: Cost[];
-  effects: Effect[]; // Effects applied EVERY time the action is used.
-  firstCompletionEffects?: Effect[]; // Effects applied ONLY the first time the action is used.
+  effects: Effect[];
+  firstCompletionEffects?: Effect[];  // First purchase bonus
   
-  maxExecutions?: number; // Limit purchases (e.g., 1 for unlocks).
-  cooldownMs?: number;    // Optional cooldown in milliseconds. CURRENTLY NOT IMPLEMENTED
-  
+  maxExecutions?: number;   // Purchase limit
   prerequisites?: Prerequisite[];
   
-  // If set, buying this locks the listed IDs (Action or Task) permanently.
-  // Useful for branching paths (Class A vs Class B).
-  exclusiveWith?: ActionID[]; 
-  locks?: string[]; // Explicitly hides/disables these IDs.
-
-  logMessage?: string; // Custom text for the game log (e.g. "You tidied up.").
+  exclusiveWith?: string[]; // Locks these action IDs when purchased
+  locks?: string[];         // Hides these IDs entirely
+  lockDescription?: string;
+  hideWhenComplete?: boolean;
+  
+  logMessage?: string;  // Custom log entry (e.g. "You learned a new skill.")
 }
 ```
 
-### E. Equipment (Items & Slots)
+### Equipment
 
-Passive buffs provided by items equipped into slots.
+Items you can equip into slots for passive bonuses.
 
 **Slots:**
 
 ```typescript
 interface SlotConfig {
-  id: string;   // e.g., "head", "hand_r"
+  id: string;   // e.g. "head", "hand_r"
   name: string;
-  // Slots can be hidden until requirements are met (e.g., Mutation: Extra Arm)
-  prerequisites?: Prerequisite[]; 
+  prerequisites?: Prerequisite[];  // Unlock conditions (e.g. mutation)
 }
 ```
 
@@ -153,12 +139,31 @@ interface ItemConfig {
   id: string;
   name: string;
   description: string;
-  slot: string; // Must match a Slot ID
-  effects: Effect[]; // Passive buffs while equipped
+  slot: string;      // Must match a slot ID
+  effects: Effect[]; // Passive bonuses while equipped
 }
 ```
 
-## 3. Logic & Mechanics
+### Converters
+
+Background processes that transform resources automatically.
+
+```typescript
+interface ConverterConfig {
+  id: string;
+  name: string;
+  description: string;
+  cost: Cost[];               // One-time purchase price
+  canBeToggled: boolean;      // false = always active when owned
+  effectsPerSecond: Effect[]; // Production
+  costPerSecond: Cost[];      // Consumption
+  prerequisites?: Prerequisite[];
+}
+```
+
+---
+
+## Mechanics
 
 ### Costs & Scaling
 
@@ -166,97 +171,112 @@ interface ItemConfig {
 interface Cost {
   resourceId: string;
   amount: number;
-  // If defined, cost = amount * (scaleFactor ^ currentLevelOrExecutions)
-  // For Tasks, defaults to scaling by (Level - 1).
-  // For Actions, scales by Executions.
-  scaleFactor?: number; 
   
-  // If true (for Tasks only), scaling uses (Completions) instead of (Level - 1).
-  scalesByCompletion?: boolean;
-
-  // Defines how scaleFactor is applied.
-  // 'fixed': cost = amount + (scaleFactor * exponent) (linear additive growth)
-  // 'percentage': cost = amount * (1 + scaleFactor * exponent) (linear percentage growth)
-  // 'exponential': cost = amount * (scaleFactor ^ exponent) (exponential growth, default if scaleType is not provided but scaleFactor is)
-  // 'tiered': behaves like 'exponential' for now, intended for future more complex step-based scaling
-  scaleType?: 'fixed' | 'percentage' | 'exponential' | 'tiered';
+  scaleFactor?: number;  // Growth rate
+  scaleType?: 'fixed' | 'percentage' | 'exponential';
+  // 'fixed':       cost = amount + (scaleFactor × exponent)
+  // 'percentage':  cost = amount × (1 + scaleFactor × exponent)
+  // 'exponential': cost = amount × (scaleFactor ^ exponent)  [default]
+  
+  scalesByCompletion?: boolean;  // Tasks only: scale by completions instead of level
 }
 ```
 
-### The "Unlock Pattern" (baseMax: 0)
-
-If you want a resource to be "hidden" until discovered:
-
-1. Set `baseMax: 0` in `resources.ts`.
-   * *Effect:* The resource is invisible and cannot be gained (capacity is 0).
-2. Create an Action (e.g., "Buy Notebook") with an effect: `modify_max_resource_flat` +10.
-3. When the user buys the action, Max Cap becomes 10. The resource appears and can now be collected.
+For Tasks, the exponent defaults to `level - 1`. For Actions, it's `executions`.
 
 ### Prerequisites
 
-Controls visibility and usability.
-*Important:* If an item requires a resource that is currently Hidden (Max <= 0), the item itself will also be hidden.
+Control when things become visible and usable.
 
 ```typescript
 interface Prerequisite {
+  // Resource conditions
   resourceId?: string;
-  minAmount?: number; // Requires current amount >= X
-  minMax?: number;    // Requires Max Cap >= X (Great for checking if a resource is unlocked)
+  minAmount?: number;  // current >= X
+  maxAmount?: number;  // current <= X
+  minMax?: number;     // capacity >= X (useful for "is unlocked?" checks)
   
-  actionId?: string;  // Requires Action to be executed at least once (or X times)
-  minExecutions?: number; // (Optional) Default 1.
+  // Action conditions
+  actionId?: string;
+  minExecutions?: number;  // default: 1
   
-  taskId?: string; // Requires Task to be at least Level X
-  minLevel?: number; // (Optional) Default 1.
+  // Task conditions
+  taskId?: string;
+  minLevel?: number;  // default: 1
 }
 ```
 
+**Note:** If any prerequisite references a hidden resource (capacity = 0), the item stays hidden until that resource is unlocked.
+
 ### Effects
 
-| Type | Target | Description |
-| :--- | :--- | :--- |
-| `add_resource` | `resourceId` | Adds currency. Affected by `scaleFactor` in Tasks. |
-| `modify_max_resource_flat` | `resourceId` | Increases Resource Cap. |
-| `modify_max_resource_pct` | `resourceId` | Multiplies Resource Cap (1 + Pct). |
-| `modify_task_yield_pct` | `taskId` | Multiplies output of a specific task. |
-| `modify_passive_gen` | `resourceId` | Adds permanent passive generation per second. |
-| `increase_max_tasks` | None (uses `amount`) | Increases the global limit of concurrent tasks. |
-| `add_item` | `itemId` | Adds item to inventory. |
+| Type | Target Property | Description |
+|------|-----------------|-------------|
+| `add_resource` | `resourceId` | Add/subtract amounts. Scales with task level. |
+| `modify_max_resource_flat` | `resourceId` | Increase capacity by a flat amount. |
+| `modify_max_resource_pct` | `resourceId` | Multiply capacity by (1 + amount). |
+| `modify_yield_pct` | `taskId` / `actionId` / `resourceId` | Multiply output by (1 + amount). Can target specific resources. |
+| `modify_yield_flat` | `taskId` / `actionId` / `resourceId` | Add flat bonus to output. Can target specific resources. |
+| `modify_passive_gen` | `resourceId` | Add permanent passive generation per second. |
+| `increase_max_tasks` | — | Raise concurrent task limit by `amount`. |
+| `increase_max_executions` | `taskId` / `actionId` | Raise execution cap. |
+| `add_item` | `itemId` | Grant an item to inventory. |
 
-**Effect Properties:**
-
+**Effect properties:**
 ```typescript
 interface Effect {
   type: string;
   amount: number;
-  scaleFactor?: number; // For levels/upgrades.
-  chance?: number;      // 0.0 - 1.0. Probability this effect triggers.
-  hidden?: boolean;     // If true, effect is applied but not shown in the tooltip.
+  
+  // Targeting (depends on effect type)
+  resourceId?: string;
+  taskId?: string;
+  actionId?: string;
+  itemId?: string;
+  
+  // Scaling
+  scaleFactor?: number;
+  scaleType?: 'fixed' | 'percentage' | 'exponential';
+  
+  chance?: number;   // 0-1, probability to trigger (default: 1)
+  hidden?: boolean;  // true = applied but not shown in tooltips
 }
 ```
 
+### The "Hidden Resource" Pattern
+
+Use `baseMax: 0` to hide a resource until the player unlocks it:
+
+1. Define the resource with `baseMax: 0` — invisible and can't hold anything.
+2. Create an action that applies `modify_max_resource_flat` to increase capacity.
+3. When purchased, the resource appears and becomes usable.
+
+This is great for hiding spoilers and gating progression.
+
 ---
 
-## 4. Example: "The Necromancer"
+## Example: Simple Necromancy Module
 
 ```typescript
-// categories.ts
-export const CATEGORIES = [{ id: "graveyard", name: "The Graveyard" }];
+// gameData/necromancy.ts
+import { CategoryConfig, ResourceConfig, TaskConfig, ActionConfig } from "../types";
 
-// resources.ts
-export const RESOURCES = [
-  { id: "bones", name: "Bones", type: "basic", baseMax: 50 },
-  { id: "mana", name: "Mana", type: "stat", baseMax: 0, color: "bg-purple-600" } // Hidden start
+export const CATEGORIES: CategoryConfig[] = [
+  { id: "graveyard", name: "The Graveyard" }
 ];
 
-// tasks.ts
-export const TASKS = [
+export const RESOURCES: ResourceConfig[] = [
+  { id: "bones", name: "Bones", type: "basic", baseMax: 50 },
+  { id: "mana", name: "Mana", type: "stat", baseMax: 0, color: "bg-purple-600" }
+];
+
+export const TASKS: TaskConfig[] = [
   {
     id: "dig_grave",
     name: "Dig Grave",
     description: "Disturb the earth.",
     category: "graveyard",
-    type: "rest", // Can be auto-selected
+    type: "rest",
     costPerSecond: [],
     effectsPerSecond: [{ type: "add_resource", resourceId: "bones", amount: 1 }],
     xpPerSecond: 5
@@ -264,29 +284,48 @@ export const TASKS = [
   {
     id: "study_corpse",
     name: "Study Corpse",
+    description: "Examine the remains for arcane secrets.",
     category: "graveyard",
-    startCosts: [{ resourceId: "bones", amount: 5 }], // One time cost
-    progressRequired: 10, // Takes 10 seconds to complete one cycle
-    autoRestart: true,    // Repeats automatically
+    startCosts: [{ resourceId: "bones", amount: 5 }],
+    progressRequired: 10,
+    autoRestart: true,
     costPerSecond: [],
     effectsPerSecond: [],
     completionEffects: [{ type: "add_resource", resourceId: "mana", amount: 10 }],
-    firstCompletionEffects: [{ type: "add_item", itemId: "bone_saw", amount: 1 }]
+    firstCompletionEffects: [{ type: "add_item", itemId: "bone_saw", amount: 1 }],
+    prerequisites: [{ resourceId: "mana", minMax: 1 }]
   }
 ];
 
-// actions.ts
-export const ACTIONS = [
+export const ACTIONS: ActionConfig[] = [
   {
     id: "unlock_magic",
     name: "Learn Necromancy",
-    description: "Unlock Mana.",
+    description: "Open yourself to the dark arts.",
     category: "graveyard",
-    costs: [{ resourceId: "bones", amount: 10 }], 
+    costs: [{ resourceId: "bones", amount: 10 }],
     effects: [{ type: "modify_max_resource_flat", resourceId: "mana", amount: 20 }],
-    firstCompletionEffects: [{ type: "add_resource", resourceId: "mana", amount: 20 }], // Bonus mana on first unlock
+    firstCompletionEffects: [{ type: "add_resource", resourceId: "mana", amount: 20 }],
     maxExecutions: 1,
     logMessage: "The purple glow of mana fills your vision."
   }
 ];
 ```
+
+Then register it in `gameData/index.ts`:
+```typescript
+import * as NecromancyModule from './necromancy';
+
+const modules = [
+  // ... existing modules
+  NecromancyModule
+];
+```
+
+---
+
+## Tips
+
+- **Test incrementally.** Add one thing, reload, verify. Much easier to debug.
+- **Use `prerequisites` liberally.** They're the main tool for pacing progression.
+- **Hidden effects** (`hidden: true`) are great for internal bookkeeping without cluttering tooltips.
