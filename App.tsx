@@ -309,7 +309,7 @@ const GameLayout: React.FC = () => {
                                 className="bg-white border border-gray-300 rounded px-2 py-1 outline-none focus:border-blue-500"
                             >
                                 <option value="">(None)</option>
-                                {config.tasks.filter(t => t.type === 'rest' && (state.tasks[t.id]?.unlocked || checkIsVisible(t.id))).map(t => (
+                                {config.tasks.filter(t => t.type === 'rest' && state.tasks[t.id]?.unlocked && checkIsVisible(t.id, t.prerequisites)).map(t => (
                                     <option key={t.id} value={t.id}>
                                         {t.name}
                                     </option>
