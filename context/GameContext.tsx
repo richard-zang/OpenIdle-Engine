@@ -119,7 +119,9 @@ const createInitialState = (): GameState => {
         log: ["Welcome. Manage your tasks and resources."],
         totalTimePlayed: 0,
         activeTaskIds: [],
-        maxConcurrentTasks: 1
+        maxConcurrentTasks: 1,
+        restTaskId: null,
+        previousTaskId: null
     };
 };
 
@@ -134,7 +136,8 @@ type Action =
     | { type: "TOGGLE_CONVERTER"; converterId: string }
     | { type: "ADD_LOG"; msg: string }
     | { type: "LOAD_GAME"; state: GameState }
-    | { type: "RESET_GAME" };
+    | { type: "RESET_GAME" }
+    | { type: "SET_REST_TASK"; taskId: string | null };
 
 // --- Helper: Clone Resources to prevent mutation ---
 const cloneResources = (resources: GameState["resources"]) => {
@@ -199,7 +202,9 @@ const gameReducer = (state: GameState, action: Action): GameState => {
                 modifiers: action.state.modifiers || defaults.modifiers,
                 log: action.state.log || defaults.log,
                 maxConcurrentTasks: action.state.maxConcurrentTasks || defaults.maxConcurrentTasks,
-                activeTaskIds: action.state.activeTaskIds || defaults.activeTaskIds
+                activeTaskIds: action.state.activeTaskIds || defaults.activeTaskIds,
+                restTaskId: action.state.restTaskId || defaults.restTaskId,
+                previousTaskId: action.state.previousTaskId || defaults.previousTaskId
             };
         }
 
@@ -208,6 +213,9 @@ const gameReducer = (state: GameState, action: Action): GameState => {
 
         case "ADD_LOG":
             return { ...state, log: [action.msg, ...state.log].slice(0, 50) };
+
+        case "SET_REST_TASK":
+            return { ...state, restTaskId: action.taskId };
 
         case "EQUIP_ITEM": {
             const item = ITEMS.find(i => i.id === action.itemId);
@@ -543,6 +551,9 @@ const gameReducer = (state: GameState, action: Action): GameState => {
             let newActions = state.actions;
             let actionsChanged = false;
             let newMaxTasks = state.maxConcurrentTasks;
+            let newRestTaskId = state.restTaskId;
+            let newPreviousTaskId = state.previousTaskId;
+            let newActiveTaskIds = [...state.activeTaskIds]; // Use mutable copy for logic, update state at end
 
             // Helper for calculating max within tick
             const getTickMax = (rid: string) => {
@@ -600,29 +611,25 @@ const gameReducer = (state: GameState, action: Action): GameState => {
             };
 
             // 1. Process Active Tasks
-            Object.keys(newTasks).forEach((tid) => {
+            // Use activeTaskIds to iterate instead of Object.keys for better control and order
+            [...newActiveTaskIds].forEach((tid) => {
                 let tState = newTasks[tid]; // Get latest reference (potentially updated by other logic?)
-                // Actually, we want to work with a local mutable copy or handle updates carefully.
-                // But since we are iterating keys, we can re-fetch.
+
 
                 if (!tState.active) return;
-                // if (tid === 'fester') logUpdates.unshift(`DEBUG: Fester Active. Progress: ${tState.progress?.toFixed(2)}`);
 
                 const config = TASKS.find(t => t.id === tid);
                 if (!config) return;
 
-                // Removed yieldMulti calculation here, will be calculated per-resource in applyTaskEffect
-
                 // Check Start Costs (If not paid, e.g. auto-restart)
                 if (!tState.paid && config.startCosts) {
-                    if (tid === 'fester') logUpdates.unshift("DEBUG: Fester !paid -> Paying Start Cost");
                     const canAffordStart = config.startCosts.every(c => {
                         const costAmount = getScaledCost(c, 0, tState.level, tState.completions || 0);
                         return (newResources[c.resourceId]?.current || 0) >= costAmount;
                     });
 
                     if (!canAffordStart) {
-                        tState.active = false;
+                        newTasks[tid] = { ...tState, active: false };
                         logUpdates.unshift(`${config.name} stopped (cannot afford restart cost).`);
                         return;
                     }
@@ -633,7 +640,7 @@ const gameReducer = (state: GameState, action: Action): GameState => {
                         newResources[c.resourceId].current -= costAmount;
                     });
                     newTasks[tid] = { ...tState, paid: true };
-                    tState = newTasks[tid];
+                    tState = newTasks[tid]; // Update local reference
                 } else if (tid === 'fester' && config.startCosts) {
                 }
 
@@ -644,8 +651,27 @@ const gameReducer = (state: GameState, action: Action): GameState => {
                 });
 
                 if (!canAfford) {
-                    tState.active = false;
+                    newTasks[tid] = { ...tState, active: false };
+                    newActiveTaskIds = newActiveTaskIds.filter(id => id !== tid);
                     logUpdates.unshift(`${config.name} stopped (insufficient resources)`);
+
+                    // AUTO REST LOGIC
+                    if (newRestTaskId && newRestTaskId !== tid) {
+                        // Activate Rest Task
+                        const restTaskConfig = TASKS.find(t => t.id === newRestTaskId);
+                        if (restTaskConfig) {
+                            newPreviousTaskId = tid; // Remember what we were doing
+
+                            // Start Rest Task
+                            // Ensure we don't duplicate if already active (e.g. multitasking)
+                            if (!newTasks[newRestTaskId].active) {
+                                newTasks[newRestTaskId] = { ...newTasks[newRestTaskId], active: true, paid: false };
+                                newActiveTaskIds.push(newRestTaskId);
+                                logUpdates.unshift(`Auto-switched to ${restTaskConfig.name} to recover.`);
+                            }
+                        }
+                    }
+
                     return;
                 }
 
@@ -654,6 +680,38 @@ const gameReducer = (state: GameState, action: Action): GameState => {
                     const scaledAmount = getScaledCost(c, 0, tState.level, tState.completions || 0);
                     newResources[c.resourceId].current -= (scaledAmount * dtSeconds);
                 });
+
+                // AUTO REST RETURN LOGIC
+                if (tid === newRestTaskId && newPreviousTaskId) {
+                    const prevConfig = TASKS.find(t => t.id === newPreviousTaskId);
+                    if (prevConfig) {
+                        // Check if ALL resources required by previous task are MAXED
+                        const allMaxed = prevConfig.costPerSecond.every(c => {
+                            const rState = newResources[c.resourceId];
+                            const rConfig = RESOURCES.find(r => r.id === c.resourceId);
+                            if (!rState || !rConfig) return true; // Should not happen
+                            const max = calculateMax(c.resourceId, allModifiers, rConfig.baseMax);
+                            // Use small epsilon or just check >= max
+                            return rState.current >= max - 0.01;
+                        });
+
+                        if (allMaxed) {
+                            // Switch Back!
+                            newTasks[tid] = { ...tState, active: false };
+                            newActiveTaskIds = newActiveTaskIds.filter(id => id !== tid);
+
+                            // Start Previous Task
+                            const prevTaskState = newTasks[newPreviousTaskId];
+                            newTasks[newPreviousTaskId] = { ...prevTaskState, active: true, paid: false };
+                            newActiveTaskIds.push(newPreviousTaskId);
+
+                            logUpdates.unshift(`Resources recovered. Returning to ${prevConfig.name}.`);
+
+                            newPreviousTaskId = null; // Clear memory
+                            return; // Stop processing rest task for this tick
+                        }
+                    }
+                }
 
                 // Timed/Progress Logic
                 if (config.progressRequired) {
@@ -676,6 +734,7 @@ const gameReducer = (state: GameState, action: Action): GameState => {
 
                         if (!config.autoRestart) {
                             tState.active = false;
+                            newActiveTaskIds = newActiveTaskIds.filter(id => id !== tid);
                             logUpdates.unshift(`${config.name} completed.`);
                         }
 
@@ -698,6 +757,7 @@ const gameReducer = (state: GameState, action: Action): GameState => {
                         // Check maxExecutions limit
                         if (config.maxExecutions && tState.completions >= config.maxExecutions) {
                             tState.active = false;
+                            newActiveTaskIds = newActiveTaskIds.filter(id => id !== tid);
                             logUpdates.unshift(`${config.name} max completions reached.`);
                             return;
                         }
@@ -797,8 +857,11 @@ const gameReducer = (state: GameState, action: Action): GameState => {
                         const currentTarget = newResources[gen.targetResourceId].current;
                         newResources[gen.targetResourceId].current = Math.min(currentTarget + delta, max);
                     }
+
                 });
             });
+
+
 
             // 3. Process Modifier-based Passive Generation
             allModifiers.forEach(m => {
@@ -1071,47 +1134,51 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return () => clearInterval(id);
     }, []);
 
-    const triggerAction = (actionId: string) => dispatch({ type: "TRIGGER_ACTION", actionId });
-    const toggleTask = (taskId: string) => dispatch({ type: "TOGGLE_TASK", taskId });
-    const setRestTask = (taskId: string) => dispatch({ type: "SET_REST_TASK", taskId });
-    const equipItem = (itemId: string) => dispatch({ type: "EQUIP_ITEM", itemId });
-    const unequipItem = (slotId: string) => dispatch({ type: "UNEQUIP_ITEM", slotId });
-    const buyConverter = (converterId: string) => dispatch({ type: "BUY_CONVERTER", converterId });
-    const toggleConverter = (converterId: string) => dispatch({ type: "TOGGLE_CONVERTER", converterId });
+    const toggleTask = (taskId: TaskID) => {
+        // If user manually toggles, we might want to interact with auto-rest logic?
+        // For now, let's say if you manually toggle a task, it just does it.
+        // BUT if you manually STOP the Rest Task, we should probably clear previousTaskId so it 
+        // doesn't jump back later unexpectedly.
+
+        const isRestTask = state.restTaskId === taskId;
+        const isActive = state.tasks[taskId]?.active;
+
+
+
+        dispatch({ type: "TOGGLE_TASK", taskId });
+    };
+
+    const triggerAction = (actionId: ActionID) => dispatch({ type: "TRIGGER_ACTION", actionId });
+    const equipItem = (itemId: ItemID) => dispatch({ type: "EQUIP_ITEM", itemId });
+    const unequipItem = (slotId: SlotID) => dispatch({ type: "UNEQUIP_ITEM", slotId });
+    const buyConverter = (converterId: ConverterID) => dispatch({ type: "BUY_CONVERTER", converterId });
+    const toggleConverter = (converterId: ConverterID) => dispatch({ type: "TOGGLE_CONVERTER", converterId });
     const addLog = (msg: string) => dispatch({ type: "ADD_LOG", msg });
+    const setRestTask = (taskId: string | null) => dispatch({ type: "SET_REST_TASK", taskId });
 
     const activeModifiers = getActiveModifiers(state);
-
-    const getMaxResource = (id: string) => {
-        const res = RESOURCES.find(r => r.id === id);
-        return res ? calculateMax(id, activeModifiers, res.baseMax) : 0;
-    };
 
     const checkPrerequisites = (prereqs?: Prerequisite[]) => {
         if (!prereqs || prereqs.length === 0) return true;
         return prereqs.every(p => {
             if (p.resourceId) {
-                const res = state.resources[p.resourceId];
-                if (!res) return false;
-                if (p.minAmount !== undefined && res.current < p.minAmount) return false;
-                if (p.maxAmount !== undefined && res.current > p.maxAmount) return false;
+                const amount = state.resources[p.resourceId]?.current || 0;
+                if (p.minAmount !== undefined && amount < p.minAmount) return false;
+                if (p.maxAmount !== undefined && amount > p.maxAmount) return false;
                 if (p.minMax !== undefined) {
-                    const max = getMaxResource(p.resourceId);
+                    const rConfig = RESOURCES.find(r => r.id === p.resourceId);
+                    const modifiers = getActiveModifiers(state);
+                    const max = calculateMax(p.resourceId, modifiers, rConfig?.baseMax ?? 0);
                     if (max < p.minMax) return false;
                 }
             }
             if (p.actionId) {
-                const act = state.actions[p.actionId];
-                const minExec = p.minExecutions || 1;
-                if (!act || act.executions < minExec) return false;
+                const executions = state.actions[p.actionId]?.executions || 0;
+                if (p.minExecutions !== undefined && executions < p.minExecutions) return false;
             }
             if (p.taskId) {
-                const task = state.tasks[p.taskId];
-                if (!task) return false;
-                // minLevel checks task level
-                if (p.minLevel !== undefined && task.level < p.minLevel) return false;
-                // minAmount checks task completions
-                if (p.minAmount !== undefined && (task.completions || 0) < p.minAmount) return false;
+                const tState = state.tasks[p.taskId];
+                if (p.minLevel !== undefined && (tState?.level || 1) < p.minLevel) return false;
             }
             return true;
         });
@@ -1135,7 +1202,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // 2. Check Global Locks (Tasks)
         const isTaskLocked = Object.keys(state.tasks).some(taskId => {
             const taskState = state.tasks[taskId];
-            // Lock if active, or if 'permanently' done (completed at least once or leveled up)
             if (taskState.active || (taskState.completions || 0) > 0 || taskState.level > 1) {
                 const config = TASKS.find(t => t.id === taskId);
                 if (config && config.locks && config.locks.includes(id)) {
@@ -1147,11 +1213,15 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (isTaskLocked) return false;
 
-        // 2. Check Latch State
         if (state.tasks[id]?.unlocked) return true;
         if (state.actions[id]?.unlocked) return true;
 
         return false;
+    };
+
+    const getMaxResource = (id: string) => {
+        const res = RESOURCES.find(r => r.id === id);
+        return res ? calculateMax(id, activeModifiers, res.baseMax) : 0;
     };
 
     const getResourceBreakdown = (resourceId: string): ResourceBreakdown => {
@@ -1174,10 +1244,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (!tState.active) return;
             const task = TASKS.find(t => t.id === tid);
             if (!task) return;
-
-            // const yieldMulti = calculateTaskYieldMultiplier(tid, activeModifiers);
-            // We need to calculate yield per resource now, so we can't have a single multiplier.
-            // But we can approximate or just calculate it inside the loop.
 
             // Only continuous costs
             task.costPerSecond.forEach(c => {
@@ -1232,7 +1298,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Check if converter can afford to run (same check as TICK)
             const canAfford = converter.costPerSecond.every(c => {
                 const available = state.resources[c.resourceId]?.current || 0;
-                // Use a small dt approximation for the check
                 const needed = c.amount * 0.1; // ~100ms tick
                 return available >= needed;
             });

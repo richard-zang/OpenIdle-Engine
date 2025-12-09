@@ -205,6 +205,8 @@ export interface GameState {
   totalTimePlayed: number;
   activeTaskIds: string[]; // Track order of active tasks for concurrency limits
   maxConcurrentTasks: number; // Cap on active tasks
+  restTaskId: string | null; // Auto-selected task when resources run dry
+  previousTaskId: string | null; // Task to return to after resting
 }
 
 export interface GameContextType {
@@ -236,4 +238,5 @@ export interface GameContextType {
   resetGame: () => void;
   exportSave: () => string;
   importSave: (saveData: string) => boolean;
+  setRestTask: (taskId: string | null) => void;
 }

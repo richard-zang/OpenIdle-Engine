@@ -299,6 +299,25 @@ const GameLayout: React.FC = () => {
 
                 {/* MIDDLE COLUMN: TABS + CONTENT */}
                 <main className="flex-grow bg-white flex flex-col min-w-[300px] relative">
+                    {/* Settings / Info Bar */}
+                    <div className="bg-gray-100 border-b border-gray-300 p-2 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                            <span className="font-bold text-gray-600">Auto-Rest:</span>
+                            <select
+                                value={state.restTaskId || ""}
+                                onChange={(e) => setRestTask(e.target.value || null)}
+                                className="bg-white border border-gray-300 rounded px-2 py-1 outline-none focus:border-blue-500"
+                            >
+                                <option value="">(None)</option>
+                                {config.tasks.filter(t => t.type === 'rest' && (state.tasks[t.id]?.unlocked || checkIsVisible(t.id))).map(t => (
+                                    <option key={t.id} value={t.id}>
+                                        {t.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
                     {/* Tab Navigation */}
                     <div className="flex border-b border-gray-300 bg-gray-50">
                         <button
