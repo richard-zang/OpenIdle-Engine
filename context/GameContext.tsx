@@ -400,12 +400,8 @@ const gameReducer = (state: GameState, action: Action): GameState => {
                 }
             };
 
-            // Standard Effects
-            config.effects.forEach(applyEffect);
-
-            // First Completion Effects (Re-iterating applyEffect logic)
-            // Wait, applyEffect uses the closure variables from triggerAction.
-            // Using forEach calls it.
+            // NOTE: applyEffect is kept for reference but replaced by applyEffectWithYield below
+            // which correctly handles yield calculations for resource effects
 
             // NOTE: We need to update resource adding to use calculateYield
             // Redefining applyEffect to handle 'add_resource' correctly with yield
