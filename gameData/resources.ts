@@ -4,22 +4,13 @@ export const RESOURCES: ResourceConfig[] = [
 
   // BODY
   {
-    id: "stamina",
-    name: "Stamina",
+    id: "time",
+    name: "Time",
     type: "stat",
-    baseMax: 10,
-    initialAmount: 10,
+    baseMax: 12,
+    initialAmount: 12,
     color: "bg-orange-300",
-    description: ""
-  },
-  {
-    id: "health",
-    name: "Health",
-    type: "stat",
-    baseMax: 5,
-    initialAmount: 5,
-    color: "bg-red-400",
-    description: ""
+    description: "There is so little in a day..."
   },
   {
     id: "mana",
@@ -31,13 +22,15 @@ export const RESOURCES: ResourceConfig[] = [
     description: ""
   },
   {
-    id: "sanity",
-    name: "Sanity",
+    id: "insanity",
+    name: "Insanity",
     type: "stat",
+    category: "oddness",
+    color: "bg-gray-400",
     baseMax: 0,
     initialAmount: 0,
-    color: "bg-gray-400",
-    description: ""
+    description: "",
+    passiveGen: [{ targetResourceId: 'time', ratePerUnit: -0.02 }]
   },
   // RESOURCES
   {
@@ -46,7 +39,7 @@ export const RESOURCES: ResourceConfig[] = [
     type: "basic",
     baseMax: 5,
     initialAmount: 0,
-    description: ""
+    description: "Grimy notes and worn coins. Worth more than your dignity, apparently."
   },
   {
     id: "lore",
@@ -57,6 +50,7 @@ export const RESOURCES: ResourceConfig[] = [
     initialAmount: 0,
     description: ""
   },
+
   {
     id: "cat",
     name: "Cat",
@@ -65,6 +59,6 @@ export const RESOURCES: ResourceConfig[] = [
     baseMax: 0,
     initialAmount: 0,
     description: "An odd furball with a pair of eyes.",
-    passiveGen: [{ targetResourceId: 'sanity', ratePerUnit: 0.3 }]
+    passiveGen: [{ targetResourceId: 'insanity', ratePerUnit: 0.01 }]
   }
 ];

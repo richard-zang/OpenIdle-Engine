@@ -7,7 +7,7 @@ export const ACTIONS: ActionConfig[] = [
     name: "Rifle through Trash",
     description: "Some people throw away their money in the street. With a bit of luck, you can take it.",
     category: "starting",
-    costs: [{ resourceId: 'stamina', amount: 1 }],
+    costs: [{ resourceId: 'time', amount: 1 }],
     effects: [
       { type: 'add_resource', resourceId: 'money', amount: 2.5, scaleFactor: 1.05 },
     ]
@@ -84,7 +84,7 @@ export const ACTIONS: ActionConfig[] = [
     category: "starting",
     costs: [],
     effects: [],
-    prerequisites: [{ taskId: 'subway_job', minExecutions: 15 }],
+    prerequisites: [{ taskId: 'subways_job', minExecutions: 15 }],
     maxExecutions: 1,
     locks: ['subways_job']
   },
@@ -109,8 +109,8 @@ export const ACTIONS: ActionConfig[] = [
     costs: [],
     effects: [{ type: 'modify_max_resource_flat', resourceId: 'cat', amount: 1 },
     { type: 'add_resource', resourceId: 'cat', amount: 1 },
-    { type: 'modify_max_resource_flat', resourceId: 'sanity', amount: 10, hidden: true },
-    { type: 'add_resource', resourceId: 'sanity', amount: 10, hidden: true },
+    { type: 'modify_max_resource_flat', resourceId: 'insanity', amount: 9, hidden: true },
+    { type: 'add_resource', resourceId: 'insanity', amount: 2, hidden: true },
     ],
     prerequisites: [{ taskId: 'wall_destroy', minExecutions: 10 }],
     maxExecutions: 1
@@ -121,7 +121,7 @@ export const ACTIONS: ActionConfig[] = [
     description: "You pet the cat. It's soft and warm.",
     category: "oddness",
     costs: [],
-    effects: [{ type: 'add_resource', resourceId: 'sanity', amount: 1 }],
+    effects: [{ type: 'add_resource', resourceId: 'insanity', amount: -0.5 }],
     prerequisites: [{ resourceId: 'cat', minMax: 1 }],
   },
   {
@@ -129,8 +129,8 @@ export const ACTIONS: ActionConfig[] = [
     name: "Talk to the cat",
     description: "You talk to the cat. It... talks back?",
     category: "oddness",
-    costs: [{ resourceId: 'sanity', amount: 1 }],
-    effects: [{ type: 'add_resource', resourceId: 'lore', amount: 0.1 }],
+    costs: [],
+    effects: [{ type: 'add_resource', resourceId: 'lore', amount: 0.1 }, { type: 'add_resource', resourceId: 'insanity', amount: 1 }],
     firstCompletionEffects: [{ type: 'modify_max_resource_flat', resourceId: 'lore', amount: 5 }],
     prerequisites: [{ resourceId: 'cat', minMax: 1 }],
     locks: ['pet_cat']
@@ -141,7 +141,7 @@ export const ACTIONS: ActionConfig[] = [
     description: "You feed the cat. It's happy.",
     category: "oddness",
     costs: [{ resourceId: 'money', amount: 1 }],
-    effects: [{ type: 'add_resource', resourceId: 'sanity', amount: 1 }],
+    effects: [{ type: 'add_resource', resourceId: 'insanity', amount: -0.5 }],
     prerequisites: [{ resourceId: 'cat', minMax: 1 }]
   },
   {
@@ -150,7 +150,7 @@ export const ACTIONS: ActionConfig[] = [
     description: "DEBUG",
     category: "basic",
     costs: [],
-    effects: [{ type: 'modify_max_resource_flat', resourceId: 'mana', amount: 1 }],
+    effects: [{ type: 'add_resource', resourceId: 'insanity', amount: 0.1 }],
   },
   {
     id: "bookstore",

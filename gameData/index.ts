@@ -6,7 +6,7 @@ import * as TasksModule from './tasks';
 import * as ActionsModule from './actions';
 import * as EquipmentModule from './equipment';
 import * as ConvertersModule from './converters';
-
+import * as CatModule from './cat/catpaths';
 
 // Seasonal content
 // import * as ChristmasModule from './christmas';
@@ -17,7 +17,8 @@ const modules: any[] = [
     TasksModule,
     ActionsModule,
     EquipmentModule,
-    ConvertersModule
+    ConvertersModule,
+    CatModule
 ];
 
 // Add quest modules

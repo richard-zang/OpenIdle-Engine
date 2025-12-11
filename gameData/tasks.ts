@@ -11,7 +11,7 @@ export const TASKS: TaskConfig[] = [
         autoRestart: true,
         costPerSecond: [],
         effectsPerSecond: [
-            { type: 'add_resource', resourceId: 'stamina', amount: 0.8 },
+            { type: 'add_resource', resourceId: 'time', amount: 0.8 },
             { type: 'add_resource', resourceId: 'health', amount: 0.2 },
             { type: 'add_resource', resourceId: 'mana', amount: 0.2 }
         ],
@@ -27,7 +27,7 @@ export const TASKS: TaskConfig[] = [
         autoRestart: true,
         costPerSecond: [],
         effectsPerSecond: [
-            { type: 'add_resource', resourceId: 'stamina', amount: 1 },
+            { type: 'add_resource', resourceId: 'time', amount: 1 },
             { type: 'add_resource', resourceId: 'health', amount: 0.5 },
             { type: 'add_resource', resourceId: 'mana', amount: 0.5 }],
         prerequisites: [{ actionId: 'appartment', minExecutions: 1 }]
@@ -41,7 +41,7 @@ export const TASKS: TaskConfig[] = [
         progressRequired: 5,
         autoRestart: true,
         costPerSecond: [
-            { resourceId: 'stamina', amount: 0.8 }
+            { resourceId: 'time', amount: 0.6 }
         ],
         effectsPerSecond: [],
         completionEffects: [
@@ -59,7 +59,7 @@ export const TASKS: TaskConfig[] = [
         progressRequired: 4,
         autoRestart: true,
         costPerSecond: [
-            { resourceId: 'stamina', amount: 1, scaleFactor: 0.95, scaleType: 'exponential' }
+            { resourceId: 'time', amount: 0.8, scaleFactor: 0.95, scaleType: 'exponential' }
         ],
         effectsPerSecond: [],
         completionEffects: [
@@ -76,16 +76,38 @@ export const TASKS: TaskConfig[] = [
         description: "You have to find the source of the scratching.",
         category: "oddness",
         type: "normal",
-        progressRequired: 1,
+        progressRequired: 3,
         autoRestart: true,
         startCosts: [{ resourceId: 'money', amount: 5 }],
-        costPerSecond: [{ resourceId: 'stamina', amount: 1, scaleFactor: 1.1, scaleType: 'exponential' }],
+        costPerSecond: [{ resourceId: 'time', amount: 0.5, scaleFactor: 1.1, scaleType: 'exponential' }],
         effectsPerSecond: [],
-        completionEffects: [],
+        completionEffects: [{ type: 'add_resource', resourceId: 'insanity', amount: 0.1 }],
         prerequisites: [{ actionId: 'scratch', minExecutions: 1 }],
         locks: [],
+        firstCompletionEffects: [
+            { type: 'modify_max_resource_flat', resourceId: 'insanity', amount: 2 }
+        ],
         maxExecutions: 10,
         hideWhenComplete: true
+    },
+    {
+        id: "explore_neighborhood",
+        name: "Explore the Neighborhood",
+        description: "Something feels different about this part of town...",
+        category: "oddness",
+        type: "normal",
+        progressRequired: 25,
+        autoRestart: false,
+        costPerSecond: [{ resourceId: 'time', amount: 0.3 }],
+        effectsPerSecond: [],
+        completionEffects: [
+            { type: 'add_resource', resourceId: 'lore', amount: 0.5 }
+        ],
+        firstCompletionEffects: [
+            { type: 'modify_max_resource_flat', resourceId: 'lore', amount: 2 }
+        ],
+        prerequisites: [{ resourceId: 'cat', minMax: 1 }],
+        maxExecutions: 5
     }
 ];
 
