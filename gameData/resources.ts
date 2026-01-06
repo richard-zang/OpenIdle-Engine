@@ -13,6 +13,15 @@ export const RESOURCES: ResourceConfig[] = [
     description: "There is so little in a day..."
   },
   {
+    id: "health",
+    name: "Health",
+    type: "stat",
+    baseMax: 12,
+    initialAmount: 12,
+    color: "bg-orange-300",
+    description: "Strength of body and mind."
+  },
+  {
     id: "mana",
     name: "Mana",
     type: "stat",
