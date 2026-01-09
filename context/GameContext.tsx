@@ -984,6 +984,12 @@ const gameReducer = (state: GameState, action: Action): GameState => {
                             const max = getTickMax(p.resourceId);
                             if (max < p.minMax) return false;
                         }
+                        if (p.maxMax !== undefined) {
+                          const max = getTickMax(p.resourceId);
+                          console.log("max: " + max);
+                          console.log("p.maxMax: " + p.maxMax);
+                          if (max > p.maxMax) return false;
+                        }
                     }
                     if (p.actionId) {
                         const act = newActions[p.actionId];
@@ -1009,6 +1015,11 @@ const gameReducer = (state: GameState, action: Action): GameState => {
                     if (checkPrereqsInternal(t.prerequisites)) {
                         newTasks[t.id] = { ...newTasks[t.id], unlocked: true };
                     }
+                }
+                if (newTasks[t.id].unlocked) {
+                  if (!checkPrereqsInternal(t.prerequisites)) {
+                    newTasks[t.id] = { ...newTasks[t.id], unlocked: false };
+                  }
                 }
             });
 
@@ -1209,6 +1220,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     const modifiers = getActiveModifiers(state);
                     const max = calculateMax(p.resourceId, modifiers, rConfig?.baseMax ?? 0);
                     if (max < p.minMax) return false;
+                }
+                if (p.maxMax !== undefined) {
+                  const rConfig = RESOURCES.find(r => r.id === p.resourceId);
+                  const modifiers = getActiveModifiers(state);
+                  const max = calculateMax(p.resourceId, modifiers, rConfig?.baseMax ?? 0);
+                  if (max > p.maxMax) return false;
                 }
             }
             if (p.actionId) {

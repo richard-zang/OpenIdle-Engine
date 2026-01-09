@@ -82,6 +82,7 @@ export interface Prerequisite {
   minAmount?: number; // If defined, gets unlocked when amount is greater than or equal to this
   maxAmount?: number; // If defined, gets unlocked when amount is less than or equal to this
   minMax?: number; // if defined, gets unlocked when max (capacity) is greater than or equal to this
+  maxMax?: number; // if defined, gets unlocked when max (capacity) is less than or equal to this
 
   actionId?: ActionID;
   minExecutions?: number;   // Requires action to be used X times (default 1)

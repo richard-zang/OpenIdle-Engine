@@ -15,7 +15,19 @@ export const TASKS: TaskConfig[] = [
             { type: 'add_resource', resourceId: 'health', amount: 0.2 },
             { type: 'add_resource', resourceId: 'mana', amount: 0.2 }
         ],
+      completionEffects: [{ type: 'modify_max_resource_flat', resourceId: 'health', amount: 1}],
         xpPerSecond: 5,
+    },
+    {
+      id: "disappear",
+      name: "Disappear",
+      description: "Disappear when health exceeds 20.",
+      category: "basic",
+      progressRequired: 1,
+      prerequisites: [{resourceId: 'health', maxMax: 20}],
+      costPerSecond: [],
+      effectsPerSecond: [
+      ],
     },
     {
         id: "rest_bed",

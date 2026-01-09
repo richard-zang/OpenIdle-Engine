@@ -195,7 +195,7 @@ interface Prerequisite {
   minAmount?: number;  // current >= X
   maxAmount?: number;  // current <= X
   minMax?: number;     // capacity >= X (useful for "is unlocked?" checks)
-  
+	maxMax?: number;		 // capacity <= X (useful for "is locked?" checks)
   // Action conditions
   actionId?: string;
   minExecutions?: number;  // default: 1
